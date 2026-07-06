@@ -12,6 +12,15 @@ Scope {
     property bool launcherInterrupted
     readonly property bool hasFullscreen: Hypr.focusedWorkspace?.toplevels.values.some(t => t.lastIpcObject.fullscreen > 1) ?? false
 
+    function openOpenvide(mode: string): void {
+        if (root.hasFullscreen)
+            return;
+        const screenState = ShellState.forActive();
+        screenState.launcher = false;
+        screenState.openvideMode = mode;
+        screenState.openvide = true;
+    }
+
     // qmllint disable unresolved-type
     CustomShortcut {
         // qmllint enable unresolved-type
@@ -68,6 +77,7 @@ Scope {
         onReleased: {
             if (!root.launcherInterrupted && !root.hasFullscreen) {
                 const screenState = ShellState.forActive();
+                screenState.openvide = false;
                 screenState.launcher = !screenState.launcher;
             }
             root.launcherInterrupted = false;
@@ -80,6 +90,22 @@ Scope {
         name: "launcherInterrupt"
         description: "Interrupt launcher keybind"
         onPressed: root.launcherInterrupted = true
+    }
+
+    // qmllint disable unresolved-type
+    CustomShortcut {
+        // qmllint enable unresolved-type
+        name: "openvide"
+        description: "Open a project set"
+        onPressed: root.openOpenvide("new")
+    }
+
+    // qmllint disable unresolved-type
+    CustomShortcut {
+        // qmllint enable unresolved-type
+        name: "openvideSwitch"
+        description: "Switch project set"
+        onPressed: root.openOpenvide("switch")
     }
 
     // qmllint disable unresolved-type
@@ -111,7 +137,7 @@ Scope {
     IpcHandler {
         function toggle(drawer: string): void {
             if (list().split("\n").includes(drawer)) {
-                if (root.hasFullscreen && ["launcher", "session", "dashboard"].includes(drawer))
+                if (root.hasFullscreen && ["launcher", "openvide", "session", "dashboard"].includes(drawer))
                     return;
                 const screenState = ShellState.forActive();
                 screenState[drawer] = !screenState[drawer];
@@ -141,6 +167,18 @@ Scope {
         }
 
         target: "nexus"
+    }
+
+    IpcHandler {
+        function open(): void {
+            root.openOpenvide("new");
+        }
+
+        function switchSet(): void {
+            root.openOpenvide("switch");
+        }
+
+        target: "openvide"
     }
 
     IpcHandler {

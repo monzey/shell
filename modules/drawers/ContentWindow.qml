@@ -60,6 +60,7 @@ StyledWindow {
 
     onHasFullscreenChanged: {
         screenState.launcher = false;
+        screenState.openvide = false;
         screenState.session = false;
         screenState.dashboard = false;
         panels.popouts.close();
@@ -68,7 +69,7 @@ StyledWindow {
     name: "drawers"
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: (fsTransitionProg > 0 && contentItem.Config.general.showOverFullscreen) || (hasSpecialWorkspace && hasFullscreenOnNormalWs) ? WlrLayer.Overlay : WlrLayer.Top
-    WlrLayershell.keyboardFocus: screenState.launcher || screenState.session ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: screenState.launcher || screenState.openvide || screenState.session ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     mask: hasFullscreen ? emptyRegion : regions
 
@@ -115,7 +116,7 @@ StyledWindow {
         active: {
             const s = root.screenState;
             const conf = root.contentItem.Config;
-            if ((s.launcher && conf.launcher.enabled) || (s.session && conf.session.enabled) || (s.sidebar && conf.sidebar.enabled))
+            if ((s.launcher && conf.launcher.enabled) || s.openvide || (s.session && conf.session.enabled) || (s.sidebar && conf.sidebar.enabled))
                 return true;
             if (!conf.dashboard.showOnHover && s.dashboard && conf.dashboard.enabled)
                 return true;
@@ -126,6 +127,7 @@ StyledWindow {
         windows: [root]
         onCleared: {
             root.screenState.launcher = false;
+            root.screenState.openvide = false;
             root.screenState.session = false;
             root.screenState.sidebar = false;
             root.screenState.dashboard = false;
@@ -185,6 +187,13 @@ StyledWindow {
             id: launcherBg
 
             panel: panels.launcher
+            deformAmount: 0.1
+        }
+
+        PanelBg {
+            id: openvideBg
+
+            panel: panels.openvide
             deformAmount: 0.1
         }
 
@@ -275,6 +284,9 @@ StyledWindow {
             }
             launcher.transform: Matrix4x4 {
                 matrix: launcherBg.deformMatrix
+            }
+            openvide.transform: Matrix4x4 {
+                matrix: openvideBg.deformMatrix
             }
             session.transform: Matrix4x4 {
                 matrix: sessionBg.deformMatrix

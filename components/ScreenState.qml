@@ -8,6 +8,7 @@ PersistentProperties {
     property bool osd
     property bool session
     property bool launcher
+    property bool openvide
     property bool dashboard
     property bool utilities
     property bool sidebar
@@ -15,4 +16,7 @@ PersistentProperties {
     // Dashboard state
     property int dashboardTab
     property date dashboardDate: new Date()
+
+    // Openvide state
+    property string openvideMode: "new"
 }

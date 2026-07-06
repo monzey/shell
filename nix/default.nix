@@ -5,8 +5,14 @@
   makeWrapper,
   makeFontsConf,
   fish,
+  coreutils,
   ddcutil,
   brightnessctl,
+  findutils,
+  git,
+  gnugrep,
+  gnused,
+  jq,
   networkmanager,
   lm_sensors,
   swappy,
@@ -38,8 +44,14 @@
   runtimeDeps =
     [
       fish
+      coreutils
       ddcutil
       brightnessctl
+      findutils
+      git
+      gnugrep
+      gnused
+      jq
       networkmanager
       lm_sensors
       swappy
