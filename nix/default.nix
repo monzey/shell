@@ -173,6 +173,42 @@ in
         --set CAELESTIA_XKB_RULES_PATH ${xkeyboard-config}/share/xkeyboard-config-2/rules/base.lst \
       	--add-flags "-p $out/share/caelestia-shell"
 
+      cat > $out/bin/caelestia-ipc <<'EOF'
+      #!/bin/sh
+      set -eu
+
+      if [ "$#" -lt 2 ]; then
+        echo "Usage: caelestia-ipc <target> <function> [args...]" >&2
+        exit 1
+      fi
+
+      instance_id=$(${quickshell}/bin/qs list --all | while read -r label id; do
+        if [ "$label" = "Instance" ]; then
+          printf '%s\n' "''${id%:}"
+          break
+        fi
+      done)
+
+      if [ -z "$instance_id" ]; then
+        systemctl --user start caelestia-shell.service >/dev/null 2>&1 || true
+        sleep 1
+        instance_id=$(${quickshell}/bin/qs list --all | while read -r label id; do
+          if [ "$label" = "Instance" ]; then
+            printf '%s\n' "''${id%:}"
+            break
+          fi
+        done)
+      fi
+
+      if [ -z "$instance_id" ]; then
+        echo "No running Caelestia/Quickshell instance found" >&2
+        exit 1
+      fi
+
+      exec ${quickshell}/bin/qs ipc --id "$instance_id" call "$@"
+      EOF
+      chmod +x $out/bin/caelestia-ipc
+
       mkdir -p $out/lib
       ln -s ${extras}/lib/* $out/lib/
     '';
