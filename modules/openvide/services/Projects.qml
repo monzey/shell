@@ -13,6 +13,7 @@ Singleton {
     property string query: ""
     property string selectedRepo: ""
     property string selectedBranch: ""
+    property var screenState
     property var items: []
 
     readonly property bool showList: step !== "folder" && step !== "branchName"
@@ -37,8 +38,9 @@ Singleton {
         return items.filter(item => item.label.toLowerCase().indexOf(q) !== -1);
     }
 
-    function open(newMode: string): void {
+    function open(newMode: string, newScreenState: ScreenState): void {
         mode = newMode;
+        screenState = newScreenState;
         step = mode === "switch" ? "switch" : "project";
         selectedRepo = "";
         selectedBranch = "";
@@ -133,7 +135,13 @@ Singleton {
                 }
 
                 try {
-                    root.items = JSON.parse(text);
+                    const parsed = JSON.parse(text);
+                    if (root.step === "switch" && parsed.length === 1 && root.screenState) {
+                        root.accept(parsed[0], root.screenState);
+                        root.items = [];
+                    } else {
+                        root.items = parsed;
+                    }
                 } catch (error) {
                     root.items = [];
                     console.log("openvide parse error: " + error);

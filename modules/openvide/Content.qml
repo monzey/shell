@@ -20,7 +20,7 @@ Item {
     implicitWidth: listWrapper.width + padding * 2
     implicitHeight: search.height + listWrapper.height + padding + search.anchors.bottomMargin
 
-    Component.onCompleted: Projects.open(root.screenState.openvideMode)
+    Component.onCompleted: Projects.open(root.screenState.openvideMode, root.screenState)
 
     Item {
         id: listWrapper
@@ -74,10 +74,10 @@ Item {
                 return;
 
             if (event.modifiers & Qt.ControlModifier) {
-                if (event.key === Qt.Key_J || event.key === Qt.Key_N) {
+                if (event.key === Qt.Key_J || event.key === Qt.Key_P) {
                     list.incrementCurrentIndex();
                     event.accepted = true;
-                } else if (event.key === Qt.Key_K || event.key === Qt.Key_P) {
+                } else if (event.key === Qt.Key_K || event.key === Qt.Key_N) {
                     list.decrementCurrentIndex();
                     event.accepted = true;
                 }
