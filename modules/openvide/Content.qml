@@ -74,10 +74,10 @@ Item {
                 return;
 
             if (event.modifiers & Qt.ControlModifier) {
-                if (event.key === Qt.Key_J || event.key === Qt.Key_P) {
+                if (event.key === Qt.Key_J || event.key === Qt.Key_N) {
                     list.incrementCurrentIndex();
                     event.accepted = true;
-                } else if (event.key === Qt.Key_K || event.key === Qt.Key_N) {
+                } else if (event.key === Qt.Key_K || event.key === Qt.Key_P) {
                     list.decrementCurrentIndex();
                     event.accepted = true;
                 }
