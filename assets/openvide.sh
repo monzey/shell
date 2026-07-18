@@ -7,26 +7,8 @@ max_depth="4"
 
 mkdir -p "$HOME/.cache/nvim"
 
-json_escape() {
-  printf '%s' "$1" | jq -Rsa .
-}
-
 json_list() {
-  local first=true
-  printf '['
-  while IFS=$'\t' read -r kind value label; do
-    [[ -z "${kind:-}" ]] && continue
-    if $first; then
-      first=false
-    else
-      printf ','
-    fi
-    printf '{"kind":%s,"value":%s,"label":%s}' \
-      "$(json_escape "$kind")" \
-      "$(json_escape "$value")" \
-      "$(json_escape "$label")"
-  done
-  printf ']'
+  jq -Rn '[inputs | split("\t") | select(length >= 3) | select(.[0] != "") | {kind: .[0], value: .[1], label: .[2]}]'
 }
 
 get_proj() {
@@ -41,9 +23,19 @@ get_proj() {
   fi
 }
 
+has_three_monitors() {
+  (( $(hyprctl monitors -j | jq 'length') >= 3 ))
+}
+
 switch_set() {
   local proj="$1"
   [[ -n "$proj" ]] || exit 0
+
+  if ! has_three_monitors; then
+    hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
+    return
+  fi
+
   hyprctl dispatch "hl.dsp.workspace.move({ workspace = \"name:$proj-lazygit\",  monitor = \"DP-6\" })"
   hyprctl dispatch "hl.dsp.workspace.move({ workspace = \"name:$proj-code\",     monitor = \"DP-7\" })"
   hyprctl dispatch "hl.dsp.workspace.move({ workspace = \"name:$proj-opencode\", monitor = \"DP-5\" })"
@@ -61,6 +53,14 @@ create_set() {
   local socket="$HOME/.cache/nvim/$proj.pipe"
 
   rm -f "$socket"
+
+  if ! has_three_monitors; then
+    hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
+    hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'lazygit'\")"
+    hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'opencode-fhs'\")"
+    hyprctl dispatch "hl.dsp.exec_cmd(\"bash -c 'cd $dir && neovide -- --listen $socket'\")"
+    return
+  fi
 
   hyprctl dispatch 'hl.dsp.focus({ monitor = "DP-6" })'
   hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-lazygit\" })"
@@ -108,7 +108,8 @@ list_branches() {
       | sed 's|.*origin/||' \
       | sed 's/^[[:space:]]*//' \
       | sort \
-      | while IFS= read -r branch; do printf 'branch\t%s\t%s\n' "$branch" "$branch"; done
+      | while IFS= read -r branch; do printf 'branch\t%s\t%s\n' "$branch" "$branch"; done \
+      || true
   } | json_list
 }
 
