@@ -12,11 +12,10 @@ Singleton {
     property string step: "project"
     property string query: ""
     property string selectedRepo: ""
-    property string selectedBranch: ""
     property var screenState
     property var items: []
 
-    readonly property bool showList: step !== "folder" && step !== "branchName"
+    readonly property bool showList: step !== "branchName"
     readonly property string helper: `${Quickshell.shellDir}/assets/openvide.sh`
     readonly property string placeholder: {
         if (step === "switch")
@@ -25,8 +24,6 @@ Singleton {
             return qsTr("Repo worktree");
         if (step === "branch")
             return qsTr("Branche");
-        if (step === "folder")
-            return qsTr("Nom dossier");
         if (step === "branchName")
             return qsTr("Nouvelle branche");
         return qsTr("Projet");
@@ -43,7 +40,6 @@ Singleton {
         screenState = newScreenState;
         step = mode === "switch" ? "switch" : "project";
         selectedRepo = "";
-        selectedBranch = "";
         load();
     }
 
@@ -77,14 +73,7 @@ Singleton {
         if (step === "branchName") {
             if (query.length === 0)
                 return;
-            selectedBranch = query;
-            step = "folder";
-            query = selectedBranch;
-            return;
-        }
-
-        if (step === "folder") {
-            run(["--create-worktree", selectedRepo, selectedBranch, query.length === 0 ? selectedBranch : query], screenState);
+            run(["--create-worktree", selectedRepo, query], screenState);
             return;
         }
 
@@ -106,9 +95,7 @@ Singleton {
             step = "branchName";
             query = "";
         } else if (step === "branch") {
-            selectedBranch = item.value;
-            step = "folder";
-            query = selectedBranch;
+            run(["--create-worktree", selectedRepo, item.value], screenState);
         }
     }
 
@@ -118,7 +105,7 @@ Singleton {
         } else if (step === "repo") {
             step = "project";
             load();
-        } else if (step === "branch" || step === "branchName" || step === "folder") {
+        } else if (step === "branch" || step === "branchName") {
             step = step === "branch" ? "repo" : "branch";
             load();
         }
