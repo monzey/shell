@@ -59,8 +59,9 @@ create_set() {
   if ! has_three_monitors; then
     hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
     hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'lazygit'\")"
-    bash "$agent_menu" "$dir"
     hyprctl dispatch "hl.dsp.exec_cmd(\"bash -c 'cd $dir && neovide -- --listen $socket'\")"
+    sleep 0.5
+    bash "$agent_menu" "$dir"
     return
   fi
 
@@ -70,7 +71,6 @@ create_set() {
 
   hyprctl dispatch 'hl.dsp.focus({ monitor = "DP-5" })'
   hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-opencode\" })"
-  bash "$agent_menu" "$dir"
 
   hyprctl dispatch 'hl.dsp.focus({ monitor = "DP-7" })'
   hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
@@ -78,6 +78,10 @@ create_set() {
 
   sleep 0.5
   switch_set "$proj"
+
+  hyprctl dispatch 'hl.dsp.focus({ monitor = "DP-5" })'
+  hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-opencode\" })"
+  bash "$agent_menu" "$dir"
 }
 
 list_projects() {
