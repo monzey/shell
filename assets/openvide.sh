@@ -4,6 +4,8 @@ set -euo pipefail
 mode="${1:-}"
 project_root="$HOME"
 max_depth="4"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+agent_menu="$script_dir/agent-menu.sh"
 
 mkdir -p "$HOME/.cache/nvim"
 
@@ -24,7 +26,7 @@ get_proj() {
 }
 
 has_three_monitors() {
-  (( $(hyprctl monitors -j | jq 'length') >= 3 ))
+  (($(hyprctl monitors -j | jq 'length') >= 3))
 }
 
 switch_set() {
@@ -57,7 +59,7 @@ create_set() {
   if ! has_three_monitors; then
     hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
     hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'lazygit'\")"
-    hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'opencode-fhs'\")"
+    bash "$agent_menu" "$dir"
     hyprctl dispatch "hl.dsp.exec_cmd(\"bash -c 'cd $dir && neovide -- --listen $socket'\")"
     return
   fi
@@ -68,7 +70,7 @@ create_set() {
 
   hyprctl dispatch 'hl.dsp.focus({ monitor = "DP-5" })'
   hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-opencode\" })"
-  hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'opencode-fhs'\")"
+  bash "$agent_menu" "$dir"
 
   hyprctl dispatch 'hl.dsp.focus({ monitor = "DP-7" })'
   hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
@@ -81,21 +83,21 @@ create_set() {
 list_projects() {
   {
     printf 'action\t__new_worktree__\t[nouveau worktree]\n'
-    find "$project_root" -maxdepth "$max_depth" -name ".git" -not -path "*/node_modules/*" 2>/dev/null \
-      | sed 's|/.git$||' \
-      | sed "s|^$HOME/||" \
-      | sort \
-      | while IFS= read -r repo; do printf 'project\t%s\t%s\n' "$repo" "$repo"; done
+    find "$project_root" -maxdepth "$max_depth" -name ".git" -not -path "*/node_modules/*" 2>/dev/null |
+      sed 's|/.git$||' |
+      sed "s|^$HOME/||" |
+      sort |
+      while IFS= read -r repo; do printf 'project\t%s\t%s\n' "$repo" "$repo"; done
   } | json_list
 }
 
 list_repos() {
-  find "$project_root" -maxdepth "$max_depth" -name ".git" -type d -not -path "*/node_modules/*" 2>/dev/null \
-    | sed 's|/.git$||' \
-    | sed "s|^$HOME/||" \
-    | sort \
-    | while IFS= read -r repo; do printf 'repo\t%s\t%s\n' "$repo" "$repo"; done \
-    | json_list
+  find "$project_root" -maxdepth "$max_depth" -name ".git" -type d -not -path "*/node_modules/*" 2>/dev/null |
+    sed 's|/.git$||' |
+    sed "s|^$HOME/||" |
+    sort |
+    while IFS= read -r repo; do printf 'repo\t%s\t%s\n' "$repo" "$repo"; done |
+    json_list
 }
 
 list_branches() {
@@ -103,22 +105,22 @@ list_branches() {
   local repo_path="$HOME/$repo"
   {
     printf 'action\t__new_branch__\t[nouvelle branche]\n'
-    git -C "$repo_path" branch -r 2>/dev/null \
-      | grep -v 'HEAD' \
-      | sed 's|.*origin/||' \
-      | sed 's/^[[:space:]]*//' \
-      | sort \
-      | while IFS= read -r branch; do printf 'branch\t%s\t%s\n' "$branch" "$branch"; done \
-      || true
+    git -C "$repo_path" branch -r 2>/dev/null |
+      grep -v 'HEAD' |
+      sed 's|.*origin/||' |
+      sed 's/^[[:space:]]*//' |
+      sort |
+      while IFS= read -r branch; do printf 'branch\t%s\t%s\n' "$branch" "$branch"; done ||
+      true
   } | json_list
 }
 
 list_sets() {
-  hyprctl workspaces -j \
-    | jq -r '.[] | select(.name | endswith("-code")) | .name[:-5]' \
-    | sort \
-    | while IFS= read -r proj; do printf 'set\t%s\t%s\n' "$proj" "$proj"; done \
-    | json_list
+  hyprctl workspaces -j |
+    jq -r '.[] | select(.name | endswith("-code")) | .name[:-5]' |
+    sort |
+    while IFS= read -r proj; do printf 'set\t%s\t%s\n' "$proj" "$proj"; done |
+    json_list
 }
 
 open_project() {
@@ -129,7 +131,7 @@ open_project() {
 
   local proj
   proj=$(get_proj "$dir")
-  if hyprctl workspaces -j | jq -e --arg n "$proj-code" '.[] | select(.name == $n)' > /dev/null 2>&1; then
+  if hyprctl workspaces -j | jq -e --arg n "$proj-code" '.[] | select(.name == $n)' >/dev/null 2>&1; then
     switch_set "$proj"
   else
     create_set "$proj" "$dir"
@@ -172,15 +174,15 @@ create_worktree() {
 }
 
 case "$mode" in
-  --list-projects) list_projects ;;
-  --list-repos) list_repos ;;
-  --list-branches) list_branches "${2:-}" ;;
-  --list-sets) list_sets ;;
-  --open-project) open_project "${2:-}" ;;
-  --switch-set) switch_set "${2:-}" ;;
-  --create-worktree) create_worktree "${2:-}" "${3:-}" "${4:-${3:-}}" ;;
-  *)
-    echo "Usage: openvide.sh --list-projects|--list-repos|--list-branches|--list-sets|--open-project|--switch-set|--create-worktree" >&2
-    exit 1
-    ;;
+--list-projects) list_projects ;;
+--list-repos) list_repos ;;
+--list-branches) list_branches "${2:-}" ;;
+--list-sets) list_sets ;;
+--open-project) open_project "${2:-}" ;;
+--switch-set) switch_set "${2:-}" ;;
+--create-worktree) create_worktree "${2:-}" "${3:-}" "${4:-${3:-}}" ;;
+*)
+  echo "Usage: openvide.sh --list-projects|--list-repos|--list-branches|--list-sets|--open-project|--switch-set|--create-worktree" >&2
+  exit 1
+  ;;
 esac
