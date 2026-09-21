@@ -11,6 +11,7 @@ select_agent() {
       "OpenCode" "opencode" \
       "Copilot" "copilot" \
       "Claude" "claude" \
+      "Codex" "codex" \
       "Agy" "agy" |
       fzf \
         --no-multi \
