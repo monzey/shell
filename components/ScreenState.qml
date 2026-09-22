@@ -19,4 +19,5 @@ PersistentProperties {
 
     // Openvide state
     property string openvideMode: "new"
+    property string openvideTarget: ""
 }

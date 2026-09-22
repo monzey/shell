@@ -20,7 +20,7 @@ Item {
     implicitWidth: listWrapper.width + padding * 2
     implicitHeight: search.height + listWrapper.height + padding + search.anchors.bottomMargin
 
-    Component.onCompleted: Projects.open(root.screenState.openvideMode, root.screenState)
+    Component.onCompleted: Projects.open(root.screenState.openvideMode, root.screenState.openvideTarget, root.screenState)
 
     Item {
         id: listWrapper
@@ -94,7 +94,9 @@ Item {
 
         Connections {
             function onOpenvideChanged(): void {
-                if (!root.screenState.openvide)
+                if (root.screenState.openvide)
+                    Projects.open(root.screenState.openvideMode, root.screenState.openvideTarget, root.screenState);
+                else
                     Projects.reset();
             }
 

@@ -12,12 +12,13 @@ Scope {
     property bool launcherInterrupted
     readonly property bool hasFullscreen: Hypr.focusedWorkspace?.toplevels.values.some(t => t.lastIpcObject.fullscreen > 1) ?? false
 
-    function openOpenvide(mode: string): void {
+    function openOpenvide(mode: string, target: string): void {
         if (root.hasFullscreen)
             return;
         const screenState = ShellState.forActive();
         screenState.launcher = false;
         screenState.openvideMode = mode;
+        screenState.openvideTarget = target;
         screenState.openvide = true;
     }
 
@@ -97,7 +98,7 @@ Scope {
         // qmllint enable unresolved-type
         name: "openvide"
         description: "Open a project set"
-        onPressed: root.openOpenvide("new")
+        onPressed: root.openOpenvide("new", "")
     }
 
     // qmllint disable unresolved-type
@@ -105,7 +106,7 @@ Scope {
         // qmllint enable unresolved-type
         name: "openvideSwitch"
         description: "Switch project set"
-        onPressed: root.openOpenvide("switch")
+        onPressed: root.openOpenvide("switch", "")
     }
 
     // qmllint disable unresolved-type
@@ -171,11 +172,15 @@ Scope {
 
     IpcHandler {
         function open(): void {
-            root.openOpenvide("new");
+            root.openOpenvide("new", "");
         }
 
         function switchSet(): void {
-            root.openOpenvide("switch");
+            root.openOpenvide("switch", "");
+        }
+
+        function agent(repo: string): void {
+            root.openOpenvide("agent", repo);
         }
 
         target: "openvide"

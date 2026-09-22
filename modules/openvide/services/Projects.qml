@@ -12,12 +12,18 @@ Singleton {
     property string step: "project"
     property string query: ""
     property string selectedRepo: ""
+    property string agentRepo: ""
     property var screenState
     property var items: []
 
     readonly property bool showList: step !== "branchName"
     readonly property string helper: `${Quickshell.shellDir}/assets/openvide.sh`
+    readonly property string agentHelper: `${Quickshell.shellDir}/assets/agent-menu.sh`
     readonly property string placeholder: {
+        if (step === "agent") {
+            const repoName = agentRepo.split("/").pop() || agentRepo;
+            return qsTr("Agent — %1").arg(repoName);
+        }
         if (step === "switch")
             return qsTr("Switch set");
         if (step === "repo")
@@ -35,11 +41,12 @@ Singleton {
         return items.filter(item => item.label.toLowerCase().indexOf(q) !== -1);
     }
 
-    function open(newMode: string, newScreenState: ScreenState): void {
+    function open(newMode: string, target: string, newScreenState: ScreenState): void {
         mode = newMode;
         screenState = newScreenState;
-        step = mode === "switch" ? "switch" : "project";
+        step = mode === "switch" ? "switch" : mode === "agent" ? "agent" : "project";
         selectedRepo = "";
+        agentRepo = target;
         load();
     }
 
@@ -49,6 +56,8 @@ Singleton {
     }
 
     function commandForStep(): list<string> {
+        if (step === "agent")
+            return ["bash", agentHelper, "--list"];
         if (step === "switch")
             return ["bash", helper, "--list-sets"];
         if (step === "repo")
@@ -69,6 +78,11 @@ Singleton {
         Quickshell.execDetached(["bash", helper, ...args]);
     }
 
+    function runAgent(agent: string, screenState: ScreenState): void {
+        screenState.openvide = false;
+        Quickshell.execDetached(["bash", agentHelper, "--launch", agentRepo, agent]);
+    }
+
     function accept(item: var, screenState: ScreenState): void {
         if (step === "branchName") {
             if (query.length === 0)
@@ -80,7 +94,9 @@ Singleton {
         if (!item)
             return;
 
-        if (step === "switch") {
+        if (step === "agent") {
+            runAgent(item.value, screenState);
+        } else if (step === "switch") {
             run(["--switch-set", item.value], screenState);
         } else if (step === "project" && item.value === "__new_worktree__") {
             step = "repo";
@@ -100,7 +116,7 @@ Singleton {
     }
 
     function goBack(screenState: ScreenState): void {
-        if (step === "project" || step === "switch") {
+        if (step === "project" || step === "switch" || step === "agent") {
             screenState.openvide = false;
         } else if (step === "repo") {
             step = "project";
