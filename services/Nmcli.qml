@@ -192,9 +192,13 @@ Singleton {
 
         proc.processFinished.connect(() => {
             const index = activeProcesses.indexOf(proc);
-            if (index >= 0) {
+            if (index >= 0)
                 activeProcesses.splice(index, 1);
-            }
+
+            // Dynamic Process instances own their stdio pipes. Keeping them
+            // parented to this singleton after they exit leaks both the QML
+            // objects and their file descriptors for the lifetime of the shell.
+            proc.destroy();
         });
 
         Qt.callLater(() => {
@@ -1504,9 +1508,19 @@ Singleton {
                 LC_ALL: "C.UTF-8"
             })
         stdout: SplitParser {
-            onRead: root.refreshOnConnectionChange()
+            // A single NetworkManager transition emits several lines. Coalesce
+            // that burst so resume does not launch overlapping groups of nmcli
+            // processes on the UI thread.
+            onRead: monitorRefreshTimer.restart()
         }
         onExited: monitorRestartTimer.start() // qmllint disable signal-handler-parameters
+    }
+
+    Timer {
+        id: monitorRefreshTimer
+
+        interval: 300
+        onTriggered: root.refreshOnConnectionChange()
     }
 
     Timer {
