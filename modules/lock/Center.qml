@@ -11,35 +11,23 @@ ColumnLayout {
     required property var lock
     readonly property real centerScale: Math.min(1, (lock.screen?.height ?? 1440) / 1440)
     readonly property int centerWidth: Tokens.sizes.lock.centerWidth * centerScale
-
-    Layout.preferredWidth: centerWidth
-    Layout.fillWidth: false
-    Layout.fillHeight: true
+    // Fixed space kept for the auth state message so the card doesn't need to resize
+    readonly property int messageReserve: 64 * centerScale
+    readonly property int reservedHeight: clock.implicitHeight + clock.Layout.topMargin + password.implicitHeight + spacing * 2 + messageReserve
 
     spacing: Tokens.spacing.largeIncreased
 
     Clock {
+        id: clock
+
         Layout.alignment: Qt.AlignHCenter
         Layout.topMargin: Tokens.padding.large
         centerScale: root.centerScale
     }
 
-    StyledText {
-        Layout.alignment: Qt.AlignHCenter
-
-        text: Time.format("dddd • d MMM").toUpperCase()
-        color: Colours.palette.m3onSurface
-        font: Tokens.font.title.builders.medium.weight(Font.DemiBold).build()
-    }
-
-    ProfilePic {
-        Layout.alignment: Qt.AlignHCenter
-        Layout.topMargin: Tokens.spacing.extraExtraLarge * root.centerScale
-        Layout.bottomMargin: Tokens.spacing.extraLarge * root.centerScale
-        centerWidth: root.centerWidth
-    }
-
     PasswordInput {
+        id: password
+
         Layout.alignment: Qt.AlignHCenter
         centerScale: Math.max(0.8, root.centerScale)
         centerWidth: root.centerWidth
