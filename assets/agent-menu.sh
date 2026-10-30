@@ -7,6 +7,7 @@ list_agents() {
     {"kind":"agent","value":"copilot","label":"Copilot","icon":"terminal"},
     {"kind":"agent","value":"claude","label":"Claude","icon":"terminal"},
     {"kind":"agent","value":"codex","label":"Codex","icon":"terminal"},
+    {"kind":"agent","value":"grok","label":"Grok","icon":"terminal"},
     {"kind":"agent","value":"agy","label":"Agy","icon":"terminal"}
   ]'
 }
@@ -21,7 +22,7 @@ launch_agent() {
   }
 
   case "$agent" in
-  opencode | copilot | claude | codex | agy) ;;
+  opencode | copilot | claude | codex | grok | agy) ;;
   *)
     printf 'Unknown agent: %s\n' "$agent" >&2
     exit 1
