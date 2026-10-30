@@ -41,6 +41,8 @@ float sdBox(vec2 p, vec2 center, vec2 halfSize) {
 }
 
 float smin(float a, float b, float k) {
+    if (k <= 0.0)
+        return min(a, b);
     // Circular smooth min — the blend fillet is a true circular arc of radius k,
     // tangent to both surfaces (not a polynomial/squircle curve). Deviates from
     // min(a, b) only in the corner region where BOTH a < k and b < k (unlike the
@@ -52,11 +54,15 @@ float smin(float a, float b, float k) {
 }
 
 float smax(float a, float b, float k) {
+    if (k <= 0.0)
+        return max(a, b);
     // Circular smooth max — dual of smin: -smin(-a, -b, k). Always >= max(a, b).
     return min(-k, max(a, b)) + length(max(vec2(a, b) + vec2(k), vec2(0.0)));
 }
 
 float smaxSharpA(float a, float b, float k) {
+    if (k <= 0.0)
+        return max(a, b);
     // Circular smax variant that keeps a's boundary sharp (no inward rounding at
     // a = 0). Used for the frame outer edge so it always fills to the edges.
     float sm = min(-k, max(a, b)) + length(max(vec2(a, b) + vec2(k), vec2(0.0)));
@@ -102,7 +108,7 @@ void main() {
 
         // Scale SDF on the axis facing a nearby border to narrow the smin blend zone
         // in that direction only, without reducing k (which would cause sharp edges).
-        if (hasInverted != 0) {
+        if (hasInverted != 0 && smoothFactor > 0.0) {
             vec2 screenHalf = sh.xy;
 
             float distY0 = (center.y + screenHalf.y) - (invertedInner.y - invertedInner.w);
@@ -189,7 +195,7 @@ void main() {
         float outerRight = invertedOuter.x + invertedOuter.z;
 
         float sinkValue = 0.0;
-        for (int i = 0; i < rectCount; i++) {
+        for (int i = 0; smoothFactor > 0.0 && i < rectCount; i++) {
             vec4 rect = rectData[i * 5];
             vec4 sinkProps = rectData[i * 5 + 1];
             vec2 sinkSh = rectData[i * 5 + 3].xy;
@@ -247,7 +253,7 @@ void main() {
         // its thinner adjacent side, so the global min is correct for every corner.
         float minThick = min(min(innerTop - outerTop, outerBot - innerBot),
                              min(innerLeft - outerLeft, outerRight - innerRight));
-        float kFrame = clamp(min(smoothFactor, minThick - 1.0), 1.0, smoothFactor);
+        float kFrame = smoothFactor > 0.0 ? clamp(min(smoothFactor, minThick - 1.0), 1.0, smoothFactor) : 0.0;
         float dFrame = smaxSharpA(dOuter, -dInner, kFrame);
 
         mergedSdf = smin(mergedSdf, dFrame, smoothFactor);

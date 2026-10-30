@@ -184,6 +184,10 @@ target wallpaper
 The taskbar runs along the top edge. Hover over the middle of the left edge
 to open the dashboard; bar popouts open below their icons.
 
+For square panel junctions, set `border.smoothing` to `0` in `shell.json`.
+This disables the curved joins between panels and the screen border,
+independently of the panel corner radii.
+
 Development workspaces have a **Git** button beside the workspace list.
 On a single screen, click it to show or hide the project's lazygit drawer,
 which opens on the expanded commit graph. With three screens, it focuses the
