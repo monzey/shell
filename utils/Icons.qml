@@ -226,6 +226,8 @@ Singleton {
             return "checklist";
         if (name === "sysmon")
             return "monitor_heart";
+        if (name.endsWith("-lazygit"))
+            return "account_tree";
         return name[0].toUpperCase();
     }
 

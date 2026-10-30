@@ -179,6 +179,16 @@ target wallpaper
   function list(): string
 ```
 
+### Bar and development workspaces
+
+The taskbar runs along the top edge. Hover over the middle of the left edge
+to open the dashboard; bar popouts open below their icons.
+
+Development workspaces have a **Git** button beside the workspace list.
+On a single screen, click it to show or hide the project's lazygit drawer,
+which opens on the expanded commit graph. With three screens, it focuses the
+project's dedicated lazygit workspace. Neovim remains available for diffs.
+
 ### PFP/Wallpapers
 
 The profile picture for the dashboard is read from the file `~/.face`, so to set

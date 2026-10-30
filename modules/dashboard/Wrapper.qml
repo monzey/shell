@@ -29,8 +29,8 @@ Item {
     property real offsetScale: shouldBeActive ? 0 : 1
 
     visible: offsetScale < 1
-    anchors.topMargin: (-implicitHeight - 5) * offsetScale
-    implicitHeight: content.implicitHeight
+    anchors.leftMargin: (-implicitWidth - 5) * offsetScale
+    implicitHeight: content.implicitHeight || 360 // Keep the left-edge hover target available before first open
     implicitWidth: content.implicitWidth || 854 // Hard coded fallback for first open
     opacity: 1 - offsetScale
 
@@ -41,8 +41,8 @@ Item {
     Loader {
         id: content
 
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: parent.right
 
         active: root.shouldBeActive || root.visible
 

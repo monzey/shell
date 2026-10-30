@@ -60,7 +60,7 @@ Item {
 
                     anchors.fill: parent
                     anchors.margins: Config.border.thickness
-                    anchors.leftMargin: (ShellState.componentsFor(root.screen)?.bar?.exclusiveZone ?? 0) + Tokens.spacing.small * Config.background.visualiser.spacing
+                    anchors.topMargin: (ShellState.componentsFor(root.screen)?.bar?.exclusiveZone ?? 0) + Tokens.spacing.small * Config.background.visualiser.spacing
 
                     values: Audio.cava.values
                     primaryColor: Qt.alpha(Colours.palette.m3primary, 0.7)
@@ -69,7 +69,7 @@ Item {
                     spacing: Tokens.spacing.extraSmall * Config.background.visualiser.spacing
                     animationDuration: Tokens.anim.durations.normal
 
-                    Behavior on anchors.leftMargin {
+                    Behavior on anchors.topMargin {
                         Anim {}
                     }
                 }
