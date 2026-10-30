@@ -25,8 +25,90 @@ get_proj() {
   fi
 }
 
+monitor_count() {
+  hyprctl monitors -j | jq 'length'
+}
+
 has_three_monitors() {
-  (($(hyprctl monitors -j | jq 'length') >= 3))
+  (($(monitor_count) >= 3))
+}
+
+lua_string() {
+  jq -cn --arg value "$1" '$value'
+}
+
+launch_on_workspace() {
+  local workspace="$1"
+  shift
+  local command
+  printf -v command '%q ' "$@"
+  hyprctl dispatch "hl.dsp.exec_cmd($(lua_string "$command"), { workspace = $(lua_string "$workspace") })"
+}
+
+# Keep the graph and push commands in a drawer toggled from the bar.
+# Neovim remains the diff viewer; the graph starts with its panel maximized.
+launch_lazygit_special() {
+  launch_on_workspace "special:$1-lazygit silent" kitty --directory "$2" lazygit --screen-mode full log
+}
+
+wait_for_window() {
+  local workspace="$1" class="$2" window attempt
+  for ((attempt = 0; attempt < 100; attempt++)); do
+    window=$(hyprctl clients -j | jq -c --arg ws "$workspace" --arg class "$class" \
+      '[.[] | select(.workspace.name == $ws and (.class | ascii_downcase) == ($class | ascii_downcase))][0] // empty')
+    if [[ -n "$window" ]]; then
+      printf '%s\n' "$window"
+      return
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
+launch_agent_window() {
+  local dir="$1" agent="$2" proj workspace editor agent_window class clients
+  proj=$(get_proj "$dir")
+  workspace="$proj-code"
+
+  if [[ $(monitor_count 2>/dev/null || true) != 1 ]] ||
+    ! hyprctl workspaces -j | jq -e --arg ws "$workspace" 'any(.[]; .name == $ws)' >/dev/null; then
+    kitty --detach --directory "$dir" --hold "$agent"
+    sleep 0.5
+    return
+  fi
+
+  # Agent selection happens asynchronously, after Neovide was launched.
+  if ! editor=$(wait_for_window "$workspace" neovide); then
+    launch_on_workspace "name:$workspace" kitty --directory "$dir" --hold "$agent"
+    return
+  fi
+
+  hyprctl dispatch "hl.dsp.focus({ window = \"address:$(jq -r '.address' <<<"$editor")\" })"
+  hyprctl dispatch 'hl.dsp.layout("preselect l")'
+  class="openvide-agent-$proj"
+  launch_on_workspace "name:$workspace" kitty --class "$class" --directory "$dir" --hold "$agent"
+  if ! agent_window=$(wait_for_window "$workspace" "$class"); then
+    printf 'Openvide: timed out waiting for the agent window.\n' >&2
+    return 1
+  fi
+
+  # Only arrange the initial pair, leaving additional user windows alone.
+  clients=$(hyprctl clients -j | jq -c --arg ws "$workspace" \
+    '[.[] | select(.workspace.name == $ws and .floating == false)]')
+  [[ $(jq 'length' <<<"$clients") == 2 ]] || return 0
+  hyprctl dispatch "hl.dsp.focus({ window = \"address:$(jq -r '.address' <<<"$agent_window")\" })"
+  # Correct the split if another window consumed the one-shot preselection.
+  if jq -e '.[0].at[0] == .[1].at[0]' <<<"$clients" >/dev/null; then
+    hyprctl dispatch 'hl.dsp.layout("togglesplit")'
+    clients=$(hyprctl clients -j | jq -c --arg ws "$workspace" \
+      '[.[] | select(.workspace.name == $ws and .floating == false)]')
+  fi
+  if jq -e --arg class "$class" \
+    '(map(select(.class == $class))[0].at[0]) > (map(select(.class != $class))[0].at[0])' <<<"$clients" >/dev/null; then
+    hyprctl dispatch 'hl.dsp.layout("swapsplit")'
+  fi
+  # Dwindle uses twice the left window's share: 1.2 gives the agent 60%.
+  hyprctl dispatch 'hl.dsp.layout("splitratio 1.2 exact")'
 }
 
 switch_set() {
@@ -56,7 +138,19 @@ create_set() {
 
   rm -f "$socket"
 
-  if ! has_three_monitors; then
+  local monitors
+  monitors=$(monitor_count)
+
+  if ((monitors == 1)); then
+    hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
+    launch_on_workspace "name:$proj-code" neovide --chdir "$dir" -- --listen "$socket"
+    launch_lazygit_special "$proj" "$dir"
+    sleep 0.5
+    bash "$agent_menu" "$dir"
+    return
+  fi
+
+  if ((monitors < 3)); then
     hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
     hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'lazygit'\")"
     hyprctl dispatch "hl.dsp.exec_cmd(\"bash -c 'cd $dir && neovide -- --listen $socket'\")"
@@ -184,9 +278,10 @@ case "$mode" in
 --list-sets) list_sets ;;
 --open-project) open_project "${2:-}" ;;
 --switch-set) switch_set "${2:-}" ;;
+--launch-agent) launch_agent_window "${2:-}" "${3:-}" ;;
 --create-worktree) create_worktree "${2:-}" "${3:-}" "${4:-${3:-}}" ;;
 *)
-  echo "Usage: openvide.sh --list-projects|--list-repos|--list-branches|--list-sets|--open-project|--switch-set|--create-worktree" >&2
+  echo "Usage: openvide.sh --list-projects|--list-repos|--list-branches|--list-sets|--open-project|--switch-set|--launch-agent|--create-worktree" >&2
   exit 1
   ;;
 esac

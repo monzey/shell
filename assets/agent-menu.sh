@@ -39,10 +39,9 @@ launch_agent() {
     exit 1
   }
 
-  kitty --detach --directory "$repo" --hold "$agent"
-
-  # Keep the workspace focused until Kitty maps the new window.
-  sleep 0.5
+  local script_dir
+  script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+  bash "$script_dir/openvide.sh" --launch-agent "$repo" "$agent"
 }
 
 case "${1:-}" in
