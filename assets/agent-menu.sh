@@ -61,9 +61,9 @@ repo=$(realpath -- "${1:-$PWD}")
   exit 1
 }
 
-command -v caelestia >/dev/null || {
-  printf 'Missing dependency: caelestia\n' >&2
+command -v caelestia-ipc >/dev/null || {
+  printf 'Missing dependency: caelestia-ipc\n' >&2
   exit 1
 }
 
-caelestia shell openvide agent "$repo"
+caelestia-ipc openvide agent "$repo"
