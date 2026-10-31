@@ -193,6 +193,18 @@ On a single screen, click it to show or hide the project's lazygit drawer,
 which opens on the expanded commit graph. With three screens, it focuses the
 project's dedicated lazygit workspace. Neovim remains available for diffs.
 
+Openvide loads `assets/openvide-nvim.lua` as a session profile and opens
+CodeDiff automatically with a unified diff and a tree of changed files.
+With one or two screens, the tree occupies eight lines below the code,
+keeping the full editor width. On wide editors with three screens, the tree
+sits on the left. Long lines wrap, and Neovide uses tighter line spacing
+while viewing compact diffs. `Tab` / `Shift-Tab` select files, `<leader>b`
+toggles the tree, `t` switches between unified and side-by-side diffs, and
+`q` closes the diff tab. In the tree, `za` expands or collapses a directory.
+The Nix package supplies CodeDiff and nui.nvim; other installations need
+these plugins on Neovim's runtime path. Neovim launched outside Openvide
+keeps its usual startup.
+
 ### PFP/Wallpapers
 
 The profile picture for the dashboard is read from the file `~/.face`, so to set

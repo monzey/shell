@@ -51,6 +51,13 @@ launch_lazygit_special() {
   launch_on_workspace "special:$1-lazygit silent" kitty --directory "$2" lazygit --screen-mode full log
 }
 
+launch_neovide() {
+  local proj="$1" dir="$2" socket="$3" compact="$4"
+  launch_on_workspace "name:$proj-code" env \
+    OPENVIDE_NVIM_PROFILE="$script_dir/openvide-nvim.lua" OPENVIDE_NVIM_COMPACT="$compact" \
+    neovide --chdir "$dir" -- --listen "$socket" -c 'lua dofile(vim.env.OPENVIDE_NVIM_PROFILE)'
+}
+
 wait_for_window() {
   local workspace="$1" class="$2" window attempt
   for ((attempt = 0; attempt < 100; attempt++)); do
@@ -143,7 +150,7 @@ create_set() {
 
   if ((monitors == 1)); then
     hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
-    launch_on_workspace "name:$proj-code" neovide --chdir "$dir" -- --listen "$socket"
+    launch_neovide "$proj" "$dir" "$socket" 1
     launch_lazygit_special "$proj" "$dir"
     sleep 0.5
     bash "$agent_menu" "$dir"
@@ -153,7 +160,7 @@ create_set() {
   if ((monitors < 3)); then
     hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
     hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'lazygit'\")"
-    hyprctl dispatch "hl.dsp.exec_cmd(\"bash -c 'cd $dir && neovide -- --listen $socket'\")"
+    launch_neovide "$proj" "$dir" "$socket" 1
     sleep 0.5
     bash "$agent_menu" "$dir"
     return
@@ -168,7 +175,7 @@ create_set() {
 
   hyprctl dispatch 'hl.dsp.focus({ monitor = "DP-7" })'
   hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
-  hyprctl dispatch "hl.dsp.exec_cmd(\"bash -c 'cd $dir && neovide -- --listen $socket'\")"
+  launch_neovide "$proj" "$dir" "$socket" 0
 
   sleep 0.5
   switch_set "$proj"

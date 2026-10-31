@@ -24,6 +24,7 @@
   rubik,
   nerd-fonts,
   qt6,
+  vimPlugins,
   quickshell,
   aubio,
   libcava,
@@ -166,6 +167,10 @@ in
     '';
 
     postInstall = ''
+      mkdir -p "$out/share/caelestia-shell/assets/nvim-plugins"
+      ln -s ${vimPlugins.codediff-nvim} "$out/share/caelestia-shell/assets/nvim-plugins/codediff.nvim"
+      ln -s ${vimPlugins.nui-nvim} "$out/share/caelestia-shell/assets/nvim-plugins/nui.nvim"
+
       makeWrapper ${quickshell}/bin/qs $out/bin/caelestia-shell \
       	--prefix PATH : "${lib.makeBinPath runtimeDeps}" \
       	--set FONTCONFIG_FILE "${fontconfig}" \
