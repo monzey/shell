@@ -39,11 +39,62 @@ Singleton {
 
     property bool hadKeyboard
     property string lastSpecialWorkspace: ""
+    property var gitReturnTargets: new Map()
+    readonly property string gitHelper: `${Quickshell.shellDir}/assets/openvide.sh`
 
     signal configReloaded
 
     function dispatch(request: string): void {
         Hyprland.dispatch(request);
+    }
+
+    function toggleProjectGit(): void {
+        const special = focusedMonitor?.lastIpcObject.specialWorkspace?.name ?? "";
+        if (special && !/^special:.+-lazygit$/.test(special))
+            return;
+        const workspace = special || focusedMonitor?.activeWorkspace?.name || focusedWorkspace?.name || "";
+        const match = workspace.match(/^(?:special:)?(.+)-(code|opencode|lazygit)$/);
+        if (!match)
+            return;
+        const project = match[1];
+        const git = workspaces.values.find(w => w.name === workspace && match[2] === "lazygit")
+            ?? workspaces.values.find(w => w.name === `special:${project}-lazygit`)
+            ?? workspaces.values.find(w => w.name === `${project}-lazygit`);
+        if (!git && gitLaunchProc.running)
+            return;
+
+        const closing = git?.name === workspace;
+        if (!closing) {
+            gitReturnTargets.set(project, {
+                workspace: workspace,
+                address: activeToplevel?.lastIpcObject.address ?? ""
+            });
+        }
+        if (!git) {
+            const pids = toplevels.values.filter(t => [`${project}-code`, `${project}-opencode`].includes(t.workspace?.name))
+                .map(t => String(t.lastIpcObject.pid));
+            gitLaunchProc.command = ["bash", gitHelper, "--open-git", project, ...pids];
+            gitLaunchProc.running = true;
+            return;
+        }
+        const drawer = git.name.startsWith("special:");
+        if (drawer)
+            dispatch(usingLua ? `hl.dsp.workspace.toggle_special(${JSON.stringify(git.name.slice(8))})` : `togglespecialworkspace ${git.name.slice(8)}`);
+        else if (!closing)
+            dispatch(usingLua ? `hl.dsp.focus({ workspace = ${JSON.stringify(`name:${git.name}`)} })` : `workspace name:${git.name}`);
+        if (!closing)
+            return;
+
+        const target = gitReturnTargets.get(project);
+        const window = target?.address && toplevels.values.find(t => t.lastIpcObject.address === target.address && t.workspace?.name === target.workspace);
+        if (window) {
+            dispatch(usingLua ? `hl.dsp.focus({ window = ${JSON.stringify(`address:${target.address}`)} })` : `focuswindow address:${target.address}`);
+            return;
+        }
+        const previous = target?.workspace && workspaces.values.some(w => w.name === target.workspace)
+            ? target.workspace : `${project}-code`;
+        if (workspaces.values.some(w => w.name === previous))
+            dispatch(usingLua ? `hl.dsp.focus({ workspace = ${JSON.stringify(`name:${previous}`)} })` : `workspace name:${previous}`);
     }
 
     function cycleSpecialWorkspace(direction: string): void {
@@ -81,6 +132,15 @@ Singleton {
 
     function monitorNames(): list<string> {
         return monitors.values.map(e => e.name);
+    }
+
+    Process {
+        id: gitLaunchProc
+
+        onExited: code => { // qmllint disable signal-handler-parameters
+            if (code !== 0)
+                Toaster.toast(qsTr("Git unavailable"), qsTr("Open this project through Openvide to associate its repository."), "warning");
+        }
     }
 
     function monitorFor(screen: ShellScreen): HyprlandMonitor {

@@ -37,6 +37,15 @@ local function configure_codediff()
   vim.cmd.runtime("plugin/codediff.lua")
 
   local lifecycle = require("codediff.ui.lifecycle")
+  local welcome = require("codediff.ui.welcome")
+  local gutter = {
+    number = true,
+    relativenumber = false,
+    numberwidth = 4,
+    signcolumn = "no",
+    foldcolumn = "0",
+    statuscolumn = "",
+  }
   local function refresh_view()
     local session = lifecycle.get_session(vim.api.nvim_get_current_tabpage())
     if session and compact and vim.g.neovide then
@@ -51,17 +60,22 @@ local function configure_codediff()
     if not session then
       return
     end
-    for _, winid in ipairs({ session.original_win, session.modified_win }) do
+    session.window_profiles = session.window_profiles or {}
+    for side, winid in pairs({ original = session.original_win, modified = session.modified_win }) do
       if winid and vim.api.nvim_win_is_valid(winid) then
-        vim.wo[winid].wrap = true
-        vim.wo[winid].linebreak = true
-        vim.wo[winid].breakindent = true
-        vim.wo[winid].number = true
-        vim.wo[winid].relativenumber = false
-        vim.wo[winid].signcolumn = "no"
-        vim.wo[winid].foldcolumn = "0"
-        vim.wo[winid].colorcolumn = ""
-        vim.wo[winid].list = false
+        -- CodeDiff restores this snapshot on focus. Keep it aligned with the
+        -- compact gutter instead of correcting a wider gutter after redraw.
+        session.window_profiles[side] = vim.tbl_extend("force", session.window_profiles[side] or {}, gutter)
+        if not welcome.is_welcome_buffer(vim.api.nvim_win_get_buf(winid)) then
+          local options = vim.tbl_extend("force", gutter, {
+            wrap = true, linebreak = true, breakindent = true, colorcolumn = "", list = false,
+          })
+          for name, value in pairs(options) do
+            if vim.wo[winid][name] ~= value then
+              vim.wo[winid][name] = value
+            end
+          end
+        end
       end
     end
   end
@@ -69,17 +83,35 @@ local function configure_codediff()
   local refresh_later = vim.schedule_wrap(refresh_view)
   vim.api.nvim_create_autocmd("User", {
     group = group,
-    pattern = { "CodeDiffOpen", "CodeDiffClose", "CodeDiffFileSelect" },
+    pattern = { "CodeDiffClose", "CodeDiffFileSelect" },
     callback = refresh_later,
   })
-  vim.api.nvim_create_autocmd({ "TabEnter", "BufWinEnter" }, { group = group, callback = refresh_later })
-  -- CodeDiff resets wrap when rendering a different file; keep narrow panes readable.
+  vim.api.nvim_create_autocmd("TabEnter", { group = group, callback = refresh_later })
+  vim.api.nvim_create_autocmd("User", {
+    group = group,
+    pattern = "CodeDiffOpen",
+    callback = function()
+      -- Register after CodeDiff's per-session handlers, so focus finishes
+      -- with the final layout before Neovim draws the next frame.
+      local events = { "WinEnter", "BufEnter", "BufWinEnter", "FileType" }
+      for _, event in ipairs(events) do
+        vim.api.nvim_clear_autocmds({ group = group, event = event })
+      end
+      vim.api.nvim_create_autocmd(events, { group = group, callback = refresh_view })
+      refresh_view()
+    end,
+  })
+  -- CodeDiff resets wrap on focus and file changes. Restore it in the same
+  -- event, before a frame can be drawn with a different text layout.
   vim.api.nvim_create_autocmd("OptionSet", {
     group = group,
     pattern = "wrap",
     callback = function()
-      if not vim.wo.wrap then
-        refresh_later()
+      local session = lifecycle.get_session(vim.api.nvim_get_current_tabpage())
+      local winid = vim.api.nvim_get_current_win()
+      if session and (winid == session.original_win or winid == session.modified_win)
+        and not vim.wo.wrap and not welcome.is_welcome_buffer(vim.api.nvim_get_current_buf()) then
+        vim.cmd("noautocmd setlocal wrap")
       end
     end,
   })

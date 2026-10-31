@@ -183,6 +183,10 @@ Scope {
             root.openOpenvide("agent", repo);
         }
 
+        function git(): void {
+            Hypr.toggleProjectGit();
+        }
+
         target: "openvide"
     }
 

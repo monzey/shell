@@ -130,18 +130,10 @@ RowLayout {
             DelegateChoice {
                 roleValue: "workspaces"
                 delegate: EntryWrapper {
-                    RowLayout {
-                        spacing: Tokens.spacing.small
-
-                        Workspaces {
-                            objectName: "taskbarWorkspaces"
-                            screen: root.screen
-                            fullscreen: root.fullscreen
-                        }
-
-                        DevGit {
-                            screen: root.screen
-                        }
+                    Workspaces {
+                        objectName: "taskbarWorkspaces"
+                        screen: root.screen
+                        fullscreen: root.fullscreen
                     }
                 }
             }

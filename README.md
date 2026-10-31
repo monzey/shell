@@ -188,10 +188,17 @@ For square panel junctions, set `border.smoothing` to `0` in `shell.json`.
 This disables the curved joins between panels and the screen border,
 independently of the panel corner radii.
 
-Development workspaces have a **Git** button beside the workspace list.
-On a single screen, click it to show or hide the project's lazygit drawer,
-which opens on the expanded commit graph. With three screens, it focuses the
-project's dedicated lazygit workspace. Neovim remains available for diffs.
+Bind `caelestia-ipc openvide git` in Hyprland to toggle Git for the current
+development project (`Super + G` in bonsly). With one or two screens, it
+shows or hides the project's lazygit drawer. With three screens, it toggles
+between the dedicated Git workspace and the previous window. If that window
+was closed, it returns to the previous project workspace instead.
+Lazygit opens on the expanded commit graph; Neovim remains the diff viewer.
+Each project set has its own lazygit process rooted in its repository or
+worktree. Openvide remembers this association in
+`$XDG_CACHE_HOME/caelestia/openvide` (default `~/.cache/caelestia/openvide`).
+If Git has been closed, the shortcut reopens it for that set. Existing sets
+can recover their repository from the working directories of their windows.
 
 Openvide loads `assets/openvide-nvim.lua` as a session profile and opens
 CodeDiff automatically with a unified diff and a tree of changed files.

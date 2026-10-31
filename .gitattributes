@@ -1,0 +1,2 @@
+# Unified patches carry whitespace in their context lines.
+nix/patches/*.patch -whitespace

@@ -6,6 +6,7 @@
   makeFontsConf,
   fish,
   coreutils,
+  util-linux,
   ddcutil,
   brightnessctl,
   findutils,
@@ -41,11 +42,15 @@
   extraRuntimeDeps ? [],
 }: let
   version = "1.0.0";
+  codediff = vimPlugins.codediff-nvim.overrideAttrs (old: {
+    patches = (old.patches or []) ++ [./patches/codediff-preserve-single-file-view.patch];
+  });
 
   runtimeDeps =
     [
       fish
       coreutils
+      util-linux
       ddcutil
       brightnessctl
       findutils
@@ -168,7 +173,7 @@ in
 
     postInstall = ''
       mkdir -p "$out/share/caelestia-shell/assets/nvim-plugins"
-      ln -s ${vimPlugins.codediff-nvim} "$out/share/caelestia-shell/assets/nvim-plugins/codediff.nvim"
+      ln -s ${codediff} "$out/share/caelestia-shell/assets/nvim-plugins/codediff.nvim"
       ln -s ${vimPlugins.nui-nvim} "$out/share/caelestia-shell/assets/nvim-plugins/nui.nvim"
 
       makeWrapper ${quickshell}/bin/qs $out/bin/caelestia-shell \

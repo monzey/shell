@@ -6,6 +6,7 @@ project_root="$HOME"
 max_depth="4"
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 agent_menu="$script_dir/agent-menu.sh"
+project_state_dir="${XDG_CACHE_HOME:-$HOME/.cache}/caelestia/openvide"
 
 mkdir -p "$HOME/.cache/nvim"
 
@@ -45,10 +46,75 @@ launch_on_workspace() {
   hyprctl dispatch "hl.dsp.exec_cmd($(lua_string "$command"), { workspace = $(lua_string "$workspace") })"
 }
 
-# Keep the graph and push commands in a drawer toggled from the bar.
+# Keep the graph and push commands in a drawer toggled by openvide's Git shortcut.
 # Neovim remains the diff viewer; the graph starts with its panel maximized.
 launch_lazygit_special() {
-  launch_on_workspace "special:$1-lazygit silent" kitty --directory "$2" lazygit --screen-mode full log
+  ensure_lazygit "$1" "$2" "special:$1-lazygit"
+}
+
+ensure_lazygit() {
+  local proj="$1" dir="$2" workspace="$3"
+  mkdir -p "$project_state_dir"
+  # All launch paths share this lock, including creation of a new project set.
+  # Hold it until the compositor sees the window, so rapid calls cannot race.
+  (
+    flock -w 15 9 || return 1
+    if hyprctl clients -j | jq -e --arg ws "$workspace" --arg class "openvide-lazygit-$proj" \
+      'any(.[]; .workspace.name == $ws and (.class == $class or ((.class | ascii_downcase) == "kitty" and .title == "lazygit")))' >/dev/null; then
+      return 0
+    fi
+    if [[ "$workspace" == special:* ]]; then
+      launch_on_workspace "$workspace silent" kitty --class "openvide-lazygit-$proj" --directory "$dir" lazygit --screen-mode full log
+    else
+      launch_on_workspace "name:$workspace" kitty --class "openvide-lazygit-$proj" --directory "$dir" lazygit --screen-mode full log
+    fi
+    wait_for_window "$workspace" "openvide-lazygit-$proj" >/dev/null
+  ) 9>"$project_state_dir/$proj.git.lock"
+}
+
+remember_project() {
+  mkdir -p "$project_state_dir"
+  jq -n --arg directory "$2" '{directory: $directory}' > "$project_state_dir/$1.json"
+}
+
+project_directory() {
+  local directory
+  directory=$(git -C "$2" rev-parse --show-toplevel 2>/dev/null) || return 1
+  [[ $(get_proj "$directory") == "$1" ]] || return 1
+  printf '%s\n' "$directory"
+}
+
+open_git() {
+  local proj="$1"
+  shift
+  [[ -n "$proj" && "$proj" != */* ]] || return 1
+  local dir="" candidate pid workspace monitors
+  if [[ -f "$project_state_dir/$proj.json" ]]; then
+    candidate=$(jq -r '.directory // empty' "$project_state_dir/$proj.json")
+    dir=$(project_directory "$proj" "$candidate") || dir=""
+  fi
+  # Existing sets predate the registry: inspect only processes belonging to
+  # this set and accept a repository only when its project identifier matches.
+  if [[ -z "$dir" ]]; then
+    for pid in "$@"; do
+      [[ "$pid" =~ ^[0-9]+$ ]] || continue
+      candidate=$(readlink -e "/proc/$pid/cwd" 2>/dev/null) || continue
+      if dir=$(project_directory "$proj" "$candidate"); then
+        break
+      fi
+    done
+  fi
+  [[ -n "$dir" ]] || return 1
+  remember_project "$proj" "$dir"
+  monitors=$(monitor_count)
+  workspace="$proj-lazygit"
+  ((monitors >= 3)) || workspace="special:$workspace"
+  ensure_lazygit "$proj" "$dir" "$workspace"
+  if ((monitors < 3)); then
+    hyprctl dispatch "hl.dsp.workspace.toggle_special($(lua_string "$proj-lazygit"))"
+  else
+    hyprctl dispatch "hl.dsp.focus({ workspace = $(lua_string "name:$workspace") })"
+  fi
 }
 
 launch_neovide() {
@@ -148,7 +214,7 @@ create_set() {
   local monitors
   monitors=$(monitor_count)
 
-  if ((monitors == 1)); then
+  if ((monitors < 3)); then
     hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
     launch_neovide "$proj" "$dir" "$socket" 1
     launch_lazygit_special "$proj" "$dir"
@@ -157,18 +223,9 @@ create_set() {
     return
   fi
 
-  if ((monitors < 3)); then
-    hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-code\" })"
-    hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'lazygit'\")"
-    launch_neovide "$proj" "$dir" "$socket" 1
-    sleep 0.5
-    bash "$agent_menu" "$dir"
-    return
-  fi
-
   hyprctl dispatch 'hl.dsp.focus({ monitor = "DP-6" })'
   hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-lazygit\" })"
-  hyprctl dispatch "hl.dsp.exec_cmd(\"kitty -d $dir --hold zsh -c 'lazygit'\")"
+  ensure_lazygit "$proj" "$dir" "$proj-lazygit"
 
   hyprctl dispatch 'hl.dsp.focus({ monitor = "DP-5" })'
   hyprctl dispatch "hl.dsp.focus({ workspace = \"name:$proj-opencode\" })"
@@ -236,6 +293,7 @@ open_project() {
 
   local proj
   proj=$(get_proj "$dir")
+  remember_project "$proj" "$dir"
   if hyprctl workspaces -j | jq -e --arg n "$proj-code" '.[] | select(.name == $n)' >/dev/null 2>&1; then
     switch_set "$proj"
   else
@@ -284,11 +342,12 @@ case "$mode" in
 --list-branches) list_branches "${2:-}" ;;
 --list-sets) list_sets ;;
 --open-project) open_project "${2:-}" ;;
+--open-git) open_git "${2:-}" "${@:3}" ;;
 --switch-set) switch_set "${2:-}" ;;
 --launch-agent) launch_agent_window "${2:-}" "${3:-}" ;;
 --create-worktree) create_worktree "${2:-}" "${3:-}" "${4:-${3:-}}" ;;
 *)
-  echo "Usage: openvide.sh --list-projects|--list-repos|--list-branches|--list-sets|--open-project|--switch-set|--launch-agent|--create-worktree" >&2
+  echo "Usage: openvide.sh --list-projects|--list-repos|--list-branches|--list-sets|--open-project|--open-git|--switch-set|--launch-agent|--create-worktree" >&2
   exit 1
   ;;
 esac

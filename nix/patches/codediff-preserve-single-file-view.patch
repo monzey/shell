@@ -1,0 +1,178 @@
+--- a/lua/codediff/ui/explorer/render.lua
++++ b/lua/codediff/ui/explorer/render.lua
+@@ -247,6 +247,7 @@
+         local sess = lifecycle.get_session(tabpage)
+         if sess and sess.layout == "inline" then
+           require("codediff.ui.view.inline_view").show_single_file(tabpage, abs_path, {
++            no_jump = opts.no_jump,
+             side = "modified",
+           })
+         else
+@@ -265,6 +266,7 @@
+         if base_revision and target_revision and target_revision ~= "WORKING" then
+           if is_inline then
+             require("codediff.ui.view.inline_view").show_single_file(tabpage, file_path, {
++              no_jump = opts.no_jump,
+               revision = target_revision,
+               git_root = git_root,
+               rel_path = file_path,
+@@ -276,6 +278,7 @@
+         elseif group == "staged" then
+           if is_inline then
+             require("codediff.ui.view.inline_view").show_single_file(tabpage, file_path, {
++              no_jump = opts.no_jump,
+               revision = ":0",
+               git_root = git_root,
+               rel_path = file_path,
+@@ -287,6 +290,7 @@
+         else
+           if is_inline then
+             require("codediff.ui.view.inline_view").show_single_file(tabpage, abs_path, {
++              no_jump = opts.no_jump,
+               side = "modified",
+             })
+           else
+@@ -306,6 +310,7 @@
+         if base_revision and target_revision and target_revision ~= "WORKING" then
+           if is_inline then
+             require("codediff.ui.view.inline_view").show_single_file(tabpage, file_path, {
++              no_jump = opts.no_jump,
+               revision = base_revision,
+               git_root = git_root,
+               rel_path = file_path,
+@@ -318,6 +323,7 @@
+           if is_inline then
+             local revision = (group == "staged") and "HEAD" or ":0"
+             require("codediff.ui.view.inline_view").show_single_file(tabpage, file_path, {
++              no_jump = opts.no_jump,
+               revision = revision,
+               git_root = git_root,
+               rel_path = file_path,
+--- a/lua/codediff/ui/auto_refresh.lua
++++ b/lua/codediff/ui/auto_refresh.lua
+@@ -363,6 +363,25 @@
+     result_timers[bufnr] = nil
+   end
+   do_result_diff_update(bufnr)
++end
++
++-- Keep every visible view stable when a virtual revision is refreshed.
++function M.set_lines_preserving_view(bufnr, lines)
++  if vim.deep_equal(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), lines) then
++    return
++  end
++  local views = {}
++  for _, win in ipairs(vim.fn.win_findbuf(bufnr)) do
++    views[win] = vim.api.nvim_win_call(win, vim.fn.winsaveview)
++  end
++  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
++  for win, view in pairs(views) do
++    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == bufnr then
++      vim.api.nvim_win_call(win, function()
++        vim.fn.winrestview(view)
++      end)
++    end
++  end
+ end
+ 
+ -- Sync mutable revision buffers (:0-:3) with current git index content.
+@@ -418,7 +437,7 @@
+         local was_readonly = vim.bo[bufnr].readonly
+         vim.bo[bufnr].readonly = false
+         vim.bo[bufnr].modifiable = true
+-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
++        M.set_lines_preserving_view(bufnr, lines)
+         vim.bo[bufnr].modifiable = was_modifiable
+         vim.bo[bufnr].readonly = was_readonly
+         -- TextChanged doesn't fire on nowrite/nofile buffers, trigger explicitly
+--- a/lua/codediff/ui/view/inline_view.lua
++++ b/lua/codediff/ui/view/inline_view.lua
+@@ -536,6 +536,12 @@
+     return
+   end
+ 
++  local session_path = (opts.revision and opts.rel_path) and opts.rel_path or file_path
++  local keep_view = opts.no_jump and (session.original_path == session_path or session.modified_path == session_path)
++  local displayed_buf = vim.api.nvim_win_get_buf(mod_win)
++  local request = {}
++  session.single_file_request = request
++
+   -- Clear old inline decorations
+   if session.modified_bufnr and vim.api.nvim_buf_is_valid(session.modified_bufnr) then
+     inline.clear(session.modified_bufnr)
+@@ -550,26 +556,31 @@
+   local file_bufnr
+   if opts.revision and opts.git_root then
+     -- Virtual file: create scratch buffer and fetch content
+-    file_bufnr = vim.api.nvim_create_buf(false, true)
+-    vim.bo[file_bufnr].buftype = "nofile"
+-    vim.api.nvim_win_set_buf(mod_win, file_bufnr)
++    if keep_view and vim.bo[displayed_buf].buftype == "nofile" then
++      file_bufnr = displayed_buf
++    else
++      file_bufnr = vim.api.nvim_create_buf(false, true)
++      vim.bo[file_bufnr].buftype = "nofile"
++      vim.api.nvim_win_set_buf(mod_win, file_bufnr)
++    end
+     welcome_window.sync(mod_win)
+     local ft = vim.filetype.match({ filename = opts.rel_path or file_path })
+-    if ft then
++    if ft and vim.bo[file_bufnr].filetype ~= ft then
+       vim.bo[file_bufnr].filetype = ft
+     end
+ 
+     local git = require("codediff.core.git")
+     git.get_file_content(opts.revision, opts.git_root, opts.rel_path or file_path, function(err, lines)
+       vim.schedule(function()
+-        if not vim.api.nvim_buf_is_valid(file_bufnr) then
++        if session.single_file_request ~= request or not vim.api.nvim_buf_is_valid(file_bufnr)
++          or not vim.api.nvim_win_is_valid(mod_win) or vim.api.nvim_win_get_buf(mod_win) ~= file_bufnr then
+           return
+         end
+         if err then
+           lines = {}
+         end
+         vim.bo[file_bufnr].modifiable = true
+-        vim.api.nvim_buf_set_lines(file_bufnr, 0, -1, false, lines)
++        auto_refresh.set_lines_preserving_view(file_bufnr, lines)
+         vim.bo[file_bufnr].modifiable = false
+       end)
+     end)
+@@ -577,15 +588,21 @@
+     -- Real file
+     file_bufnr = vim.fn.bufadd(file_path)
+     vim.fn.bufload(file_bufnr)
+-    vim.api.nvim_win_set_buf(mod_win, file_bufnr)
++    if displayed_buf ~= file_bufnr then
++      vim.api.nvim_win_set_buf(mod_win, file_bufnr)
++    end
+     welcome_window.sync(mod_win)
+   end
+ 
+   -- Update session state
+-  local empty_buf = vim.api.nvim_create_buf(false, true)
+-  vim.bo[empty_buf].buftype = "nofile"
+-
+-  local session_path = (opts.revision and opts.rel_path) and opts.rel_path or file_path
++  local empty_buf = keep_view and (side == "original" and session.modified_bufnr or session.original_bufnr) or nil
++  if not empty_buf or not vim.api.nvim_buf_is_valid(empty_buf) or empty_buf == file_bufnr
++    or vim.bo[empty_buf].buftype ~= "nofile" or vim.api.nvim_buf_line_count(empty_buf) ~= 1
++    or vim.api.nvim_buf_get_lines(empty_buf, 0, 1, false)[1] ~= "" then
++    empty_buf = vim.api.nvim_create_buf(false, true)
++    vim.bo[empty_buf].buftype = "nofile"
++  end
++
+   local orig_bufnr = side == "original" and file_bufnr or empty_buf
+   local mod_bufnr = side == "modified" and file_bufnr or empty_buf
+   local original_path = side == "original" and session_path or ""
+@@ -600,7 +617,9 @@
+ 
+   local view_keymaps = require("codediff.ui.view.keymaps")
+   view_keymaps.setup_all_keymaps(tabpage, orig_bufnr, mod_bufnr, session.mode == "explorer")
+-  layout.arrange(tabpage)
++  if not keep_view then
++    layout.arrange(tabpage)
++  end
+   welcome_window.sync_later(mod_win)
+ end
+ 
