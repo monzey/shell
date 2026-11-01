@@ -2,6 +2,7 @@
   rev,
   lib,
   stdenv,
+  fetchFromGitHub,
   makeWrapper,
   makeFontsConf,
   fish,
@@ -11,6 +12,7 @@
   brightnessctl,
   findutils,
   git,
+  lazygit,
   gnugrep,
   gnused,
   jq,
@@ -44,6 +46,16 @@
   version = "1.0.0";
   codediff = vimPlugins.codediff-nvim.overrideAttrs (old: {
     patches = (old.patches or []) ++ [./patches/codediff-preserve-single-file-view.patch];
+  });
+  openvideLazygit = lazygit.overrideAttrs (old: {
+    version = "0.48.0";
+    src = fetchFromGitHub {
+      owner = "jesseduffield";
+      repo = "lazygit";
+      rev = "v0.48.0";
+      hash = "sha256-L3OcCkoSJZ6skzcjP2E3BrQ39cXyxcuHGthj8RHIGeQ=";
+    };
+    patches = (old.patches or []) ++ [./patches/lazygit-openvide-context.patch];
   });
 
   runtimeDeps =
@@ -172,6 +184,8 @@ in
     '';
 
     postInstall = ''
+      mkdir -p "$out/share/caelestia-shell/assets/bin"
+      ln -s ${openvideLazygit}/bin/lazygit "$out/share/caelestia-shell/assets/bin/lazygit"
       mkdir -p "$out/share/caelestia-shell/assets/nvim-plugins"
       ln -s ${codediff} "$out/share/caelestia-shell/assets/nvim-plugins/codediff.nvim"
       ln -s ${vimPlugins.nui-nvim} "$out/share/caelestia-shell/assets/nvim-plugins/nui.nvim"

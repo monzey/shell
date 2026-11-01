@@ -193,7 +193,16 @@ development project (`Super + G` in bonsly). With one or two screens, it
 shows or hides the project's lazygit drawer. With three screens, it toggles
 between the dedicated Git workspace and the previous window. If that window
 was closed, it returns to the previous project workspace instead.
-Lazygit opens on the expanded commit graph; Neovim remains the diff viewer.
+Lazygit shows the active worktree, remotes and commit graph in full-width
+panels, with most space given to the focused panel. `2`, `3` and `4` jump
+to worktrees, remotes and commits; pressing a panel's number again cycles
+its tabs. Worktrees show their branch and full path, with `*` marking the
+current worktree; remotes show their URLs. The graph includes all branches.
+Neovim remains the diff viewer.
+The Openvide profile in `assets/openvide-lazygit.yml` overlays the user's
+Lazygit configuration, retaining its theme and keybindings. The Nix package
+supplies Lazygit 0.48 with Worktrees and Remotes selected by default in this
+profile; ordinary Lazygit sessions keep their usual startup.
 Each project set has its own lazygit process rooted in its repository or
 worktree. Openvide remembers this association in
 `$XDG_CACHE_HOME/caelestia/openvide` (default `~/.cache/caelestia/openvide`).

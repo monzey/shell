@@ -47,7 +47,7 @@ launch_on_workspace() {
 }
 
 # Keep the graph and push commands in a drawer toggled by openvide's Git shortcut.
-# Neovim remains the diff viewer; the graph starts with its panel maximized.
+# Worktrees and remotes stay visible; Neovim remains the diff viewer.
 launch_lazygit_special() {
   ensure_lazygit "$1" "$2" "special:$1-lazygit"
 }
@@ -63,10 +63,20 @@ ensure_lazygit() {
       'any(.[]; .workspace.name == $ws and (.class == $class or ((.class | ascii_downcase) == "kitty" and .title == "lazygit")))' >/dev/null; then
       return 0
     fi
+    local executable="$script_dir/bin/lazygit" configs="${LG_CONFIG_FILE:-}"
+    [[ -x "$executable" ]] || executable="lazygit"
+    if [[ -z "$configs" ]]; then
+      local config_dir
+      config_dir=$("$executable" --print-config-dir)
+      [[ ! -f "$config_dir/config.yml" ]] || configs="$config_dir/config.yml"
+    fi
+    configs="${configs:+$configs,}$script_dir/openvide-lazygit.yml"
     if [[ "$workspace" == special:* ]]; then
-      launch_on_workspace "$workspace silent" kitty --class "openvide-lazygit-$proj" --directory "$dir" lazygit --screen-mode full log
+      launch_on_workspace "$workspace silent" kitty --class "openvide-lazygit-$proj" --title lazygit --directory "$dir" \
+        env "LG_CONFIG_FILE=$configs" OPENVIDE_GIT_OVERVIEW=1 "$executable" --screen-mode normal log
     else
-      launch_on_workspace "name:$workspace" kitty --class "openvide-lazygit-$proj" --directory "$dir" lazygit --screen-mode full log
+      launch_on_workspace "name:$workspace" kitty --class "openvide-lazygit-$proj" --title lazygit --directory "$dir" \
+        env "LG_CONFIG_FILE=$configs" OPENVIDE_GIT_OVERVIEW=1 "$executable" --screen-mode normal log
     fi
     wait_for_window "$workspace" "openvide-lazygit-$proj" >/dev/null
   ) 9>"$project_state_dir/$proj.git.lock"

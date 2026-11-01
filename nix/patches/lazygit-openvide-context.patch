@@ -1,0 +1,100 @@
+--- a/pkg/gui/gui.go
++++ b/pkg/gui/gui.go
+@@ -581,6 +581,11 @@
+ 
+ 	for _, context := range contextTree.Flatten() {
+ 		result.Set(context.GetWindowName(), context.GetViewName())
++	}
++
++	if os.Getenv("OPENVIDE_GIT_OVERVIEW") == "1" {
++		result.Set("files", contextTree.Worktrees.GetViewName())
++		result.Set("branches", contextTree.Remotes.GetViewName())
+ 	}
+ 
+ 	return result
+--- a/pkg/gui/layout.go
++++ b/pkg/gui/layout.go
+@@ -1,6 +1,8 @@
+ package gui
+ 
+ import (
++	"os"
++
+ 	"github.com/jesseduffield/gocui"
+ 	"github.com/jesseduffield/lazygit/pkg/gui/context"
+ 	"github.com/jesseduffield/lazygit/pkg/gui/types"
+@@ -263,6 +265,11 @@
+ 	}
+ 	gui.g.Mutexes.ViewsMutex.Unlock()
+ 
++	if os.Getenv("OPENVIDE_GIT_OVERVIEW") == "1" {
++		gui.helpers.Window.MoveToTopOfWindow(gui.State.Contexts.Worktrees)
++		gui.helpers.Window.MoveToTopOfWindow(gui.State.Contexts.Remotes)
++	}
++
+ 	return nil
+ }
+ 
+--- a/pkg/gui/presentation/remotes.go
++++ b/pkg/gui/presentation/remotes.go
+@@ -1,6 +1,8 @@
+ package presentation
+ 
+ import (
++	"os"
++	"strings"
+ 	"time"
+ 
+ 	"github.com/jesseduffield/lazygit/pkg/commands/models"
+@@ -52,5 +54,8 @@
+ 		descriptionStr += " " + style.FgCyan.Sprint(itemOperationStr+" "+utils.Loader(time.Now(), userConfig.Gui.Spinner))
+ 	}
+ 	res = append(res, textStyle.Sprint(r.Name), descriptionStr)
++	if os.Getenv("OPENVIDE_GIT_OVERVIEW") == "1" && len(r.Urls) > 0 {
++		res = append(res, textStyle.Sprint(strings.Join(r.Urls, " | ")))
++	}
+ 	return res
+ }
+--- a/pkg/gui/presentation/worktrees.go
++++ b/pkg/gui/presentation/worktrees.go
+@@ -1,6 +1,8 @@
+ package presentation
+ 
+ import (
++	"os"
++
+ 	"github.com/jesseduffield/lazygit/pkg/commands/models"
+ 	"github.com/jesseduffield/lazygit/pkg/gui/presentation/icons"
+ 	"github.com/jesseduffield/lazygit/pkg/gui/style"
+@@ -47,5 +49,12 @@
+ 		name += " " + tr.MissingWorktree
+ 	}
+ 	res = append(res, textStyle.Sprint(name))
++	if os.Getenv("OPENVIDE_GIT_OVERVIEW") == "1" {
++		branch := worktree.Branch
++		if branch == "" {
++			branch = "(detached HEAD)"
++		}
++		res = append(res, textStyle.Sprint(branch), style.FgBlue.Sprint(worktree.Path))
++	}
+ 	return res
+ }
+--- a/pkg/gui/presentation/commits.go
++++ b/pkg/gui/presentation/commits.go
+@@ -2,6 +2,7 @@
+ 
+ import (
+ 	"fmt"
++	"os"
+ 	"strings"
+ 	"time"
+ 
+@@ -60,6 +61,8 @@
+ ) [][]string {
+ 	mutex.Lock()
+ 	defer mutex.Unlock()
++
++	fullDescription = fullDescription || os.Getenv("OPENVIDE_GIT_OVERVIEW") == "1"
+ 
+ 	if len(commits) == 0 {
+ 		return nil
